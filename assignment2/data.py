@@ -12,8 +12,8 @@ from torchvision import transforms
 ####################################
 # Your implementation starts here. #
 ####################################
-IMAGE_MEAN = None
-IMAGE_STD = None
+IMAGE_MEAN = [0.5671100616455078, 0.5338499546051025, 0.4884072542190552]
+IMAGE_STD = [0.23326335847377777, 0.23415613174438477, 0.25748953223228455]
 ##################################
 # Your implementation ends here. #
 ##################################
@@ -107,7 +107,16 @@ def get_train_loader(root, batch_size):
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    train_transform = transforms.Compose([
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGE_MEAN, IMAGE_STD),
+    ])
+
+    train_dataset = VMRDDataset(root=root, split="train", transform=train_transform)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+
     ##################################
     # Your implementation ends here. #
     ##################################
@@ -128,7 +137,13 @@ def get_val_loader(root, batch_size):
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    val_transform = transforms.Compose([
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGE_MEAN, IMAGE_STD),
+    ])
+    val_dataset = VMRDDataset(root=root, split="val", transform=val_transform)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     ##################################
     # Your implementation ends here. #
     ##################################
@@ -149,7 +164,13 @@ def get_test_loader(root, batch_size):
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    test_transform = transforms.Compose([
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize(IMAGE_MEAN, IMAGE_STD),
+    ])
+    test_dataset = VMRDDataset(root=root, split="test", transform=test_transform)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False, num_workers=4)
     ##################################
     # Your implementation ends here. #
     ##################################
