@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.ipynb_checkpoints/
+data/*
+!data/VMRD_COCO.tar.gz.part-*
+outputs/
+*.zip
