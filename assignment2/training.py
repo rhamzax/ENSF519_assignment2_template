@@ -105,7 +105,13 @@ def detection_loss(logits, gt_objectness, gt_class, gt_boxes,
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    selected_class_logits = select_object_cells(class_logits, object_cells)
+    selected_class_targets = select_object_cells(gt_class.unsqueeze(1), object_cells).squeeze(1)
+
+    class_loss = F.cross_entropy(selected_class_logits, selected_class_targets)
+
+    total_loss = objectness_loss + class_loss + box_loss_weight * box_loss
+
     ##################################
     # Your implementation ends here. #
     ##################################
@@ -140,7 +146,42 @@ def train_detection_model(model, train_loader, num_epochs, device,
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    optimizer_kwargs = {"lr": 2.5e-3, "weight_decay": 1e-4}
+    optimizer_kwargs.update(kwargs.get("optimizer_kwargs", {}))
+    scheduler_kwargs = {"max_lr": 2.5e-3, "pct_start": 0.15}
+    scheduler_kwargs.update(kwargs.get("scheduler_kwargs", {}))
+    loss_kwargs = kwargs.get("loss_kwargs", {})
+
+    optimizer = torch.optim.AdamW(model.parameters(), **optimizer_kwargs)
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+        optimizer,
+        epochs=num_epochs,
+        steps_per_epoch=len(train_loader),
+        **scheduler_kwargs,
+    )
+
+    model.train()
+    for epoch in range(num_epochs):
+        for images, gt_objectness, gt_class, gt_boxes in train_loader:
+            images = images.to(device)
+            gt_objectness = gt_objectness.to(device)
+            gt_class = gt_class.to(device)
+            gt_boxes = gt_boxes.to(device)
+
+            logits = model(images)
+            total_loss, objectness_loss, class_loss, box_loss = detection_loss(
+                logits, gt_objectness, gt_class, gt_boxes, **loss_kwargs
+            )
+
+            optimizer.zero_grad()
+            total_loss.backward()
+            optimizer.step()
+            scheduler.step()
+
+            loss_history["total_loss"].append(total_loss.item())
+            loss_history["objectness_loss"].append(objectness_loss.item())
+            loss_history["class_loss"].append(class_loss.item())
+            loss_history["box_loss"].append(box_loss.item())
 
     ##################################
     # Your implementation ends here. #
@@ -171,7 +212,41 @@ def evaluate_detection_model(model, data_loader, device, **kwargs):
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    loss_kwargs = kwargs.get("loss_kwargs", {})
+    all_logits, all_objectness, all_class, all_boxes = [], [], [], []
+    num_images = 0
+
+    model.eval()
+    with torch.no_grad():
+        for images, gt_objectness, gt_class, gt_boxes in data_loader:
+            logits = model(images.to(device))
+            total_loss, objectness_loss, class_loss, box_loss = detection_loss(
+                logits,
+                gt_objectness.to(device),
+                gt_class.to(device),
+                gt_boxes.to(device),
+                **loss_kwargs,
+            )
+
+            batch_size = images.shape[0]
+            average_losses["total_loss"] += total_loss.item() * batch_size
+            average_losses["objectness_loss"] += objectness_loss.item() * batch_size
+            average_losses["class_loss"] += class_loss.item() * batch_size
+            average_losses["box_loss"] += box_loss.item() * batch_size
+            num_images += batch_size
+
+            all_logits.append(logits.cpu())
+            all_objectness.append(gt_objectness)
+            all_class.append(gt_class)
+            all_boxes.append(gt_boxes)
+
+    for name in average_losses:
+        average_losses[name] /= num_images
+
+    predicted_logits = torch.cat(all_logits).numpy()
+    all_gt_objectness = torch.cat(all_objectness).numpy()
+    all_gt_class = torch.cat(all_class).numpy()
+    all_gt_boxes = torch.cat(all_boxes).numpy()
     ##################################
     # Your implementation ends here. #
     ##################################

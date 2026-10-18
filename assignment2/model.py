@@ -24,7 +24,57 @@ class ResNet9Detector(nn.Module):
         ####################################
         # Your implementation starts here. #
         ####################################
-        pass
+        self.use_skip = kwargs.get("use_skip", True)
+
+        self.block1 = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+
+        self.res1 = nn.Sequential(
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU()
+        )
+
+        self.block2 = nn.Sequential(
+            nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.Conv2d(256, 384, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(384),
+            nn.ReLU(),
+            nn.MaxPool2d(2)
+        )
+
+        self.res2 = nn.Sequential(
+            nn.Conv2d(384, 384, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(384),
+            nn.ReLU(),
+            nn.Conv2d(384, 384, kernel_size=3, stride=1, padding=1),
+            nn.BatchNorm2d(384),
+            nn.ReLU()
+        )
+
+        self.pool = nn.MaxPool2d(2)
+
+        self.head = nn.Sequential(
+            nn.Conv2d(384, 256, kernel_size=3, stride=1, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(256, num_classes + 5, kernel_size=1, stride=1)
+        )
+
+
+
         ##################################
         # Your implementation ends here. #
         ##################################
@@ -41,7 +91,18 @@ class ResNet9Detector(nn.Module):
         ####################################
         # Your implementation starts here. #
         ####################################
-        pass
+        x = self.block1(images)
+
+        r = self.res1(x)
+        x = x + r if self.use_skip else r
+
+        x = self.block2(x)
+
+        r = self.res2(x)
+        x = x + r if self.use_skip else r
+
+        x = self.pool(x)
+        logits = self.head(x)
         ##################################
         # Your implementation ends here. #
         ##################################
@@ -62,7 +123,9 @@ def logits_to_pred(logits):
     ####################################
     # Your implementation starts here. #
     ####################################
-    pass
+    objectness_logits = logits[:, 0, :, :]
+    class_logits = logits[:, 1:NUM_CLASSES + 1, :, :]
+    pred_boxes = torch.sigmoid(logits[:, NUM_CLASSES + 1:, :, :])
     ##################################
     # Your implementation ends here. #
     ##################################
